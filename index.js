@@ -2,106 +2,101 @@ constraints = {
     audio: true,
     video: { width: 480, height: 300 },
 };
-const websocket = new WebSocket("ws://localhost:9999/");
-var websocket2;
-navigator.mediaDevices
-.getUserMedia(constraints)
-.then((mediaStream) => {
-    document.getElementById('my-camera').srcObject = mediaStream
-    
-    
-    
-    websocket.addEventListener("open",()=>{
-        websocket.send(JSON.stringify({'type':'init','name':'abdw32dqc'}))
-        setInterval(() => {
-            media = new MediaStream()
-            const track = mediaStream.getVideoTracks()[0];
-            media.addTrack(track)
+document.getElementById('confirm').onclick=()=>{
+    const name =document.getElementById('yourname').value
+    navigator.mediaDevices
+    .getUserMedia(constraints)
+    .then((mediaStream) => {
+        document.getElementById('my-camera').srcObject = mediaStream
+        const websocket = new WebSocket("ws://localhost:9999/");
+        websocket.addEventListener("open",()=>{
+            websocket.send(JSON.stringify({'type':'init','name':name}))
             const recorderOptions = {
                 mimeType: 'video/webm',
                 videoBitsPerSecond: 200000 // 0.2 Mbit/sec.
-              };
+        };
             const mediaRecorder = new MediaRecorder(mediaStream, recorderOptions);
-            mediaRecorder.start(5000);
-            mediaRecorder.ondataavailable = (event) =>{
+            mediaRecorder.start();
 
-                websocket.send(event.data)
+            mediaRecorder.ondataavailable = e => {
+                websocket.send(e.data)
             }
-
-          }, 5000);
-        
-        
-    })
-
-    websocket.addEventListener("message",async ({data})=>{
-        console.log(data)
-        const event = JSON.parse(data);
-        switch (event.type){
-            case "init":
-                event.connections.forEach(async connection => {
-                    console.log(connection)
-                    video = document.createElement('video')
-                    video.setAttribute("id",connection)
-                    video.setAttribute("autoplay",true)
-                    document.body.appendChild(video)
-                    websocket2 = new WebSocket("ws://localhost:9999/");
-                    websocket2.addEventListener("open",()=>{
-            
-                    websocket2.send(JSON.stringify({'type':'getOthersData','channel': connection}))
-
-                    websocket2.addEventListener("message",({data})=>{
-                        const datasrc = URL.createObjectURL( data );
-                        video.src = datasrc;
-                        video.load();
+            setInterval(()=>{mediaRecorder.requestData()},5000)
                 
-                        })
-                    })
-                    console.log(1,websocket2)                    
-                });
-                
-                break
-            case "new connection":
-                video = document.createElement('video')
-                video.setAttribute("id",event.name)
-                video.setAttribute("autoplay",true)
-                document.body.appendChild(video)
-                websocket2 = new WebSocket("ws://localhost:9999/");
-                websocket2.addEventListener("open",()=>{
-        
-                websocket2.send(JSON.stringify({'type':'getOthersData','channel': event.name}))
-
-
-                websocket2.addEventListener("message",({data})=>{
-                    const datasrc = URL.createObjectURL( data );
-                    video.src = datasrc;
-                    video.load();
-                })
-                console.log(2,websocket2)
-
-                
-            })
-                break
-        }
-        console.log(3,websocket2)
-    })
     
-  })
-  .catch((err) => {
 
-  });
-
-function getOthersData(name){
-    return new Promise(resolve => {
-        const websocket = new WebSocket("ws://localhost:9999/");
-        websocket.addEventListener("open",()=>{
             
-            websocket.send(JSON.stringify({'type':'getOthersData','channel': name}))
-            websocket.addEventListener("message",({data})=>{
-                const newObjectUrl = URL.createObjectURL( data );
-                resolve(newObjectUrl)
-                
-            })
+            
         })
+    
+        websocket.addEventListener("message",async ({data})=>{
+            console.log(data)
+            const event = JSON.parse(data);
+            switch (event.type){
+                case "init":
+                    event.connections.forEach(async connection => {
+                        var video = document.createElement('video')
+                        video.setAttribute("id",connection)
+                        video.setAttribute("width",480)
+                        video.setAttribute("height",300)
+                        video.setAttribute('autoplay',1)
+                        // video.setAttribute("id",connection)
+                        document.body.appendChild(video)
+                        const sub_websocket = new WebSocket("ws://localhost:9999/");
+                        sub_websocket.addEventListener("open",()=>{
+                            sub_websocket.send(JSON.stringify({'type':'getOthersData','channel': connection}))
+                        })
+                        sub_websocket.addEventListener("message",(event)=>{
+                            // window.URL.revokeObjectURL(video.currentSrc)
+                            video.src = window.URL.createObjectURL( event.data );
+                            video.load();
 
-    })
-}
+                        })
+                    });
+                    
+                    break
+                case "new connection":
+                    var video = document.createElement('video')
+                    video.setAttribute("id",event.name)
+                    video.setAttribute("width",480)
+                    video.setAttribute("height",300)
+                    video.setAttribute('autoplay',1)
+                    document.body.appendChild(video)
+                    const sub_websocket = new WebSocket("ws://localhost:9999/");
+                    sub_websocket.addEventListener("open",()=>{
+                        sub_websocket.send(JSON.stringify({'type':'getOthersData','channel': event.name}))
+                    })    
+                    const media = new MediaSource()
+                    data  = window.URL.createObjectURL( media );
+                    video.src= data
+                    // media.addEventListener('sourceopen',()=>{
+                        
+                    //     const dd = media.addSourceBuffer('video/webm; codecs="vorbis,vp8""');
+                    //     console.log(dd)
+                    //     sub_websocket.addEventListener("message",(event)=>{
+                    //         var fileReader = new FileReader();
+                    //         fileReader.readAsArrayBuffer(event.data)
+                    //         fileReader.onload = function(event) {
+                    //             console.log(dd)
+                    //             arrayBuffer = event.target.result;
+                    //             var data = new Uint8Array(arrayBuffer);
+                          
+                    //             dd.appendBuffer(data)
+                    //             video.load()}
+
+
+                            // window.URL.revokeObjectURL(video.currentSrc)
+                            // video.src = window.URL.createObjectURL( event.data );
+                        
+                    })
+
+                })
+                
+                    break
+            }
+        })
+        
+      })
+      
+    }
+    
