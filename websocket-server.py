@@ -13,11 +13,20 @@ connections = {}
 
 async def init(websocket,message):
     name = message['name']
-    device = 'hasCamera' if message['device'] > 1 else 'audio'
+    device = 'hasCamera' if message['device']==2 else 'audio'
+
+    while connections.get(name,None):
+        await websocket.send(json.dumps({'type':'error','msg':'duplicated name'}))
+        message = json.loads(await websocket.recv())
+        name = message['name']
+
+    connectionsData = [connection[0] for connection in connections.values()]
+
     #Send room status to new connection
+    
     room_status = {
         'type' : 'initChat',
-        'connectionsData' : [connection[0] for connection in connections.values()],
+        'connectionsData' : connectionsData,
     }
     await websocket.send(json.dumps(room_status))
     
@@ -29,8 +38,9 @@ async def init(websocket,message):
     for connection in connections.values():
         print(connection)
         await connection[1].send(json.dumps(message_to_other_connections))
-
+    
     connections[name] = [(name,device),websocket]
+    return name
 
     
 async def streaming(websocket,channel):
@@ -38,9 +48,12 @@ async def streaming(websocket,channel):
         while True:
             data = await websocket.recv()
             for connection in connections.get(channel,[])[2::]:
+                print(connection)
                 await connection.send(data)
     except Exception as e:
         print(e)
+        for connection in connections.get(channel,[])[2::]:
+                await connection.close()
         del connections[channel]
 
 async def handler(websocket):
@@ -50,8 +63,8 @@ async def handler(websocket):
     message = json.loads(data)
     print(message)
     if message['type'] == 'init':
-        await init(websocket,message)
-        await streaming(websocket,message['name'])
+        channel = await init(websocket,message)
+        await streaming(websocket,channel)
     elif message['channel'] in connections:
         connections[message['channel']].append(websocket)
         await websocket.wait_closed()
