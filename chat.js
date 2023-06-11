@@ -2,6 +2,7 @@ var user_name
 var device_setting
 var mediaRecorder
 var websocket
+var dataBuffer = {};
 
 (async () => {device_setting = await detectWebcam()})();
 const confirm_button = document.getElementById('confirm')
@@ -60,6 +61,9 @@ function prepareStreaming(){
         mediaRecorder.ondataavailable = e => {
             websocket.send(e.data)
         }
+        mediaRecorder.onstop = e => {
+            websocket.send("stream reinit")
+        }
     })
 }
 
@@ -69,16 +73,16 @@ function processData(event){
         case 'initChat':
             prepareStreaming()
             data.connectionsData.forEach(connectionData => {
-                processNewConnection(connectionData,500)
+                processNewConnection(connectionData,1000)
             })
             if (data.connectionsData.length){
-                setTimeout(startStreaming,1000)
+                setTimeout(startStreaming,700)
             }
             break;
         case 'newConnection':
             mediaRecorder.stop()
             processNewConnection(data.connectionData)
-            setTimeout(startStreaming,1000)
+            setTimeout(startStreaming,1500)
             break;
         case 'error':
             errorHandler(data)
@@ -87,48 +91,54 @@ function processData(event){
 
 
 function processNewConnection(connectionData,delay=0){
-        var partnerName = connectionData[0]
-        var partnerDeviceType = connectionData[1] == 'hasCamera' ? 'video/webm; codecs="vp8,opus"' : 'audio/webm;codecs=opus'
-        var updateVideo
-        var dataBuffer = []
-        var sub_websocket = new WebSocket("wss://gintaku.xyz:9999/");
-        var videoElement = createVideoElement(partnerName)
-        var videoBuffer
-        var mediaSource
+    dataBuffer[partnerName] = []
+    var partnerName = connectionData[0]
+    var partnerDeviceType = connectionData[1] == 'hasCamera' ? 'video/webm; codecs="vp8,opus"' : 'audio/webm;codecs=opus'
+    var sub_websocket = new WebSocket("wss://gintaku.xyz:9999/");
+    var videoElement = createVideoElement(partnerName)
+    var mediaSource
 
-        sub_websocket.onopen = ()=>{
-            sub_websocket.send(JSON.stringify({'type':'getOthersData','channel': partnerName}))
-            mediaSource = new MediaSource()
-            videoElement.src = URL.createObjectURL(mediaSource)
-            mediaSource.onsourceopen = () => {
-                updateVideo = setInterval(()=>{
-                    try {
-                        if (!videoBuffer){
-                            videoBuffer = mediaSource.addSourceBuffer(partnerDeviceType)                        
-                        }
-                        if (dataBuffer.length){
-                            videoBuffer.appendBuffer(dataBuffer.shift())
-                        }
-                    } catch (error) {
-                        console.log('here1',error,partnerName)
-                        clearInterval(updateVideo)
-                    }
-                },100)
-            }
-
+    sub_websocket.onopen = ()=>{
+        sub_websocket.send(JSON.stringify({'type':'getOthersData','channel': partnerName}))
+        handleStreamingData(mediaSource,videoElement,partnerDeviceType,partnerName)
         setTimeout(()=>{
             sub_websocket.onmessage = async (event)=>{
             try {
-                dataBuffer.push(await event.data.arrayBuffer())
+                dataBuffer[partnerName].push(await event.data.arrayBuffer())
             } catch (error) {
-                console.log('here2', error)
-                dataBuffer.push(event.data)                
+                console.log('stream reinit signal recv!', error)
+                dataBuffer[partnerName].push(event.data)                
             }
         }
-    },delay)
+        },delay)
         sub_websocket.onclose = () => {
             document.getElementById('col-'+partnerName).remove()
+            if (document.getElementsByTagName('video').length == 1){
+                mediaRecorder.stop()
+            }
         }
+    }
+}
+
+function handleStreamingData(mediaSource,videoElement,partnerDeviceType,partnerName){
+    mediaSource = new MediaSource()
+    videoElement.src = URL.createObjectURL(mediaSource)
+    mediaSource.onsourceopen = () => {
+        var videoBuffer = mediaSource.addSourceBuffer(partnerDeviceType)                        
+        var updateVideo = setInterval(()=>{
+            try {
+                if (dataBuffer[partnerName].length){
+                    data =dataBuffer[partnerName].shift()
+                    videoBuffer.appendBuffer(data)
+                }
+            } catch (error) {
+                console.log('here1',error)
+                console.log('partner name:',partnerName)
+                clearInterval(updateVideo)
+                setTimeout(()=>dataBuffer[partnerName]=[],1000)
+                setTimeout(()=>handleStreamingData(mediaSource,videoElement,partnerDeviceType,partnerName),1500)
+            }
+        },100)
     }
 }
 
