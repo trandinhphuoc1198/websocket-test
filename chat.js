@@ -5,7 +5,7 @@ var websocket
 
 (async () => {device_setting = await detectWebcam()})();
 const confirm_button = document.getElementById('confirm')
-const input_user_name = document.getElementById('user_name')
+const input_user_name = document.getElementById('username')
 const myvideo = document.getElementById('my-video')
 
 input_user_name.onkeyup = (e) => {
@@ -18,7 +18,7 @@ input_user_name.onkeyup = (e) => {
 confirm_button.onclick = startProcess
 
 function startProcess(e){
-    if (!document.getElementById('user_name').value){
+    if (!document.getElementById('username').value){
         alert('Must input something!!')
         return
     }
@@ -36,7 +36,7 @@ function startProcess(e){
 }
 
 function initConnect(){
-    user_name = document.getElementById('user_name').value
+    user_name = document.getElementById('username').value
     msg = {
         'type':'init',
         'name':user_name,
@@ -49,7 +49,8 @@ function initConnect(){
 
 function prepareStreaming(){
     confirm_button.remove()
-    input_user_name.remove()
+    input_user_name.disabled=1
+    document.getElementsByClassName('card')[0].classList.add('border-primary')
     navigator.mediaDevices
     .getUserMedia(device_setting)
     .then((mediaStream) => {
@@ -101,9 +102,6 @@ function processNewConnection(connectionData,delay=0){
             videoElement.src = URL.createObjectURL(mediaSource)
             mediaSource.onsourceopen = () => {
                 updateVideo = setInterval(()=>{
-                    if (partnerName=='2'){
-                        console.log(dataBuffer)
-                    }
                     try {
                         if (!videoBuffer){
                             videoBuffer = mediaSource.addSourceBuffer(partnerDeviceType)                        
@@ -115,7 +113,7 @@ function processNewConnection(connectionData,delay=0){
                         console.log('here1',error,partnerName)
                         clearInterval(updateVideo)
                     }
-                },1000)
+                },100)
             }
 
         setTimeout(()=>{
@@ -129,7 +127,7 @@ function processNewConnection(connectionData,delay=0){
         }
     },delay)
         sub_websocket.onclose = () => {
-            videoElement.remove();
+            document.getElementById('col-'+partnerName).remove()
         }
     }
 }
@@ -143,14 +141,17 @@ function errorHandler(data){
 }
 
 function createVideoElement(id){
-    videoElement = document.createElement('video')
-    videoElement.setAttribute("id",id)
-    videoElement.setAttribute("width",480)
-    videoElement.setAttribute("height",300)
-    videoElement.setAttribute("autoplay",1)
-    videoElement.setAttribute("poster","https://i0.wp.com/digitalhealthskills.com/wp-content/uploads/2022/11/fd35c-no-user-image-icon-27.png?fit=500%2C500&ssl=1")
-    document.body.appendChild(videoElement)
-    return videoElement
+    original_node = document.getElementsByClassName('col')[0]
+    clone_node = original_node.cloneNode(true)
+    clone_node.id = 'col-' + id
+    clone_node.children[0].classList.remove('border-primary')
+    clone_node.children[0].classList.add('border-danger')
+    clone_node.children[0].children[0].id = id
+    clone_node.children[0].children[1].children[0].innerHTML = id
+    clone_node.children[0].children[1].children[0].classList.add('form-control')
+    original_node.parentNode.insertBefore(clone_node, null);
+
+    return document.getElementById(id)
 }
 
 function detectWebcam() {
@@ -166,7 +167,7 @@ function detectWebcam() {
 }
 
 function startStreaming(){
-    mediaRecorder.start(1000)
+    mediaRecorder.start(100)
 }
 
 

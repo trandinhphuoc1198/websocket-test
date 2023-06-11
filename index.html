@@ -5,19 +5,36 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
     <style>
+        body {
+            background-image: url('saber.jpg');
+            background-size: 1920px 1080px;
+        }
         video{
             object-fit: inherit;
         }
     </style>
 </head>
 <body>
-    <div>
-        <input placeholder="your nickname" type="text" id="user_name">
-        <button disabled id="confirm">OK</button>
+    <div class="container mt-3">
+        <div class="row row-cols-1 row-cols-md-2 g-4">
+            <div class="col">
+                <div class="card mb-2" style="width: 480px;">
+                    <video class="card-img-top" poster="https://i0.wp.com/digitalhealthskills.com/wp-content/uploads/2022/11/fd35c-no-user-image-icon-27.png?fit=500%2C500&ssl=1"
+                    playsinline width="480" height="300" autoplay  id="my-video"></video>
+                    <div class="card-body " >
+                        <div class="input-group ">
+                            <input id="username" type="text" placeholder="your name here" class="form-control"></input>
+                            <button class="btn  btn-primary" disabled id="confirm">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
-    <video poster="https://i0.wp.com/digitalhealthskills.com/wp-content/uploads/2022/11/fd35c-no-user-image-icon-27.png?fit=500%2C500&ssl=1"
-    playsinline width="480" height="300" autoplay  id="my-video"></video>
     <script src="chat.js"></script>
 </body>
 </html>
