@@ -2,21 +2,54 @@ var user_name
 var device_setting
 var mediaRecorder
 var websocket
-var dataBuffer = {};
+const dataBuffer = {};
 
 (async () => {device_setting = await detectWebcam()})();
-const confirm_button = document.getElementById('confirm')
+const SHARE_SCREEN = document.getElementById('share')
+const SHARE_VIDEO = document.getElementById('screen-video')
+const CONFIRM_BUTTON = document.getElementById('confirm')
 const input_user_name = document.getElementById('username')
 const myvideo = document.getElementById('my-video')
 
+SHARE_SCREEN.onclick = shareScreen
+
 input_user_name.onkeyup = (e) => {
     if (e.target.value){
-        confirm_button.disabled=0
+        CONFIRM_BUTTON.disabled=0
     } else {
-        confirm_button.disabled=1
+        CONFIRM_BUTTON.disabled=1
     }
 }
-confirm_button.onclick = startProcess
+CONFIRM_BUTTON.onclick = startProcess
+
+function shareScreen(){
+    navigator.mediaDevices.getDisplayMedia().then(stream=>{
+        handleVideoElement('none')
+        SHARE_VIDEO.srcObject=stream
+        const screen_websocket = new WebSocket('wss://gintaku.xyz:9999')
+        const screenRecorder = new MediaRecorder(stream,{mimeType:'video/webm; codecs="vp8,opus"'})
+        screenRecorder.ondataavailable = (e) =>{
+            screen_websocket.send(e.data)
+        }
+
+        screen_websocket.onopen = ()=>{
+            msg = {
+                'type':'share screen',
+                'name':user_name
+            }
+            screen_websocket.send(JSON.stringify(msg))
+        }
+        screen_websocket.onmessage = (e)=>{
+            
+                screenRecorder.start(300)
+            
+        }
+
+        stream.getVideoTracks()[0].onended=()=>{
+            handleVideoElement('')
+        }
+    }).catch(error=>{console.log(error)});
+}
 
 function startProcess(e){
     if (!document.getElementById('username').value){
@@ -41,7 +74,7 @@ function initConnect(){
     msg = {
         'type':'init',
         'name':user_name,
-        'device':Object.keys(device_setting).length //length>1 == hasCamera
+        'device':Object.keys(device_setting).length, //length>1 == hasCamera
     }
     if (websocket.readyState){
         websocket.send(JSON.stringify(msg))
@@ -49,7 +82,7 @@ function initConnect(){
 }
 
 function prepareStreaming(){
-    confirm_button.remove()
+    CONFIRM_BUTTON.remove()
     input_user_name.disabled=1
     document.getElementsByClassName('card')[0].classList.add('border-primary')
     navigator.mediaDevices
@@ -84,18 +117,24 @@ function processData(event){
             processNewConnection(data.connectionData)
             setTimeout(startStreaming,1500)
             break;
+        case 'share screen':
+            processNewConnection(data.connectionData,screen_sharing=1)
         case 'error':
             errorHandler(data)
     }
 }
 
 
-function processNewConnection(connectionData,delay=0){
-    dataBuffer[partnerName] = []
+function processNewConnection(connectionData,delay=0,screen_sharing=0){
     var partnerName = connectionData[0]
+    dataBuffer[partnerName] = []
     var partnerDeviceType = connectionData[1] == 'hasCamera' ? 'video/webm; codecs="vp8,opus"' : 'audio/webm;codecs=opus'
     var sub_websocket = new WebSocket("wss://gintaku.xyz:9999/");
-    var videoElement = createVideoElement(partnerName)
+    if (screen_sharing){
+        var videoElement = SHARE_VIDEO
+    }else {
+        var videoElement = createVideoElement(partnerName)
+    }
     var mediaSource
 
     sub_websocket.onopen = ()=>{
@@ -178,6 +217,13 @@ function detectWebcam() {
 
 function startStreaming(){
     mediaRecorder.start(100)
+}
+
+function handleVideoElement(display=''){
+    document.getElementsByClassName('container mt-3')[0].style.display=display
+    if (display){
+        SHARE_VIDEO.style.display=''
+    } else{ SHARE_VIDEO.style.display='none' }
 }
 
 

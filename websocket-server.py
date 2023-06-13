@@ -39,18 +39,44 @@ async def init(websocket,message):
     
     return name
 
-    
+async def init_share_screen(websocket,message):
+    message_to_other_connections = {
+        'type' : message['type'],
+        'connectionData' : ['share_screen','hasCamera']
+    }
+    for connection in connections.values():
+        if connection[0][0] != message['name']:
+            await connection[1].send(json.dumps(message_to_other_connections))
+    connections['share_screen']=[]
+    await asyncio.sleep(1)
+    await websocket.send(b'1')
+    return 'share_screen'
+
+
 async def streaming(websocket,channel):
-    try:
-        while True:
-            data = await websocket.recv()
+    if channel == 'share_screen':
+        try:
+            while True:
+                data = await websocket.recv()
+                for connection in connections.get(channel,[]):
+                    await connection.send(data)
+        except Exception as e:
+            print(e)
+            for connection in connections.get(channel,[]):
+                    await connection.close()
+            del connections[channel]
+    else:
+
+        try:
+            while True:
+                data = await websocket.recv()
+                for connection in connections.get(channel,[])[2::]:
+                    await connection.send(data)
+        except Exception as e:
+            print(e)
             for connection in connections.get(channel,[])[2::]:
-                await connection.send(data)
-    except Exception as e:
-        print(e)
-        for connection in connections.get(channel,[])[2::]:
-                await connection.close()
-        del connections[channel]
+                    await connection.close()
+            del connections[channel]
 
 async def handler(websocket):
 
@@ -60,6 +86,9 @@ async def handler(websocket):
     print(message)
     if message['type'] == 'init':
         channel = await init(websocket,message)
+        await streaming(websocket,channel)
+    elif message['type'] == 'share screen':
+        channel = await init_share_screen(websocket,message)
         await streaming(websocket,channel)
     elif message['channel'] in connections:
         connections[message['channel']].append(websocket)
