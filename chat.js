@@ -10,6 +10,7 @@ const SHARE_VIDEO = document.getElementById('screen-video')
 const CONFIRM_BUTTON = document.getElementById('confirm')
 const input_user_name = document.getElementById('username')
 const myvideo = document.getElementById('my-video')
+var sharing_with_audio = 'video/webm; codecs="vp8"'
 
 SHARE_SCREEN.onclick = shareScreen
 
@@ -23,7 +24,10 @@ input_user_name.onkeyup = (e) => {
 CONFIRM_BUTTON.onclick = startProcess
 
 function shareScreen(){
-    navigator.mediaDevices.getDisplayMedia().then(stream=>{
+    navigator.mediaDevices.getDisplayMedia({video:true,audio:true}).then(stream=>{
+        if (stream.getAudioTracks().length){
+            sharing_with_audio = 'video/webm; codecs="vp8,opus"'
+        }
         handleVideoElement('none')
         SHARE_VIDEO.srcObject=stream
         const screen_websocket = new WebSocket('wss://gintaku.xyz:9999')
@@ -35,17 +39,18 @@ function shareScreen(){
         screen_websocket.onopen = ()=>{
             msg = {
                 'type':'share screen',
-                'name':user_name
+                'name':user_name,
+                'device': sharing_with_audio
             }
             screen_websocket.send(JSON.stringify(msg))
         }
         screen_websocket.onmessage = (e)=>{
-            
-                screenRecorder.start(300)
+                setTimeout(()=>screenRecorder.start(1200),500)
             
         }
 
         stream.getVideoTracks()[0].onended=()=>{
+            screen_websocket.close()
             handleVideoElement('')
         }
     }).catch(error=>{console.log(error)});
@@ -118,7 +123,8 @@ function processData(event){
             setTimeout(startStreaming,1500)
             break;
         case 'share screen':
-            processNewConnection(data.connectionData,screen_sharing=1)
+            handleVideoElement('none')
+            processNewConnection(data.connectionData,delay=0,screen_sharing=1)
         case 'error':
             errorHandler(data)
     }
@@ -128,13 +134,20 @@ function processData(event){
 function processNewConnection(connectionData,delay=0,screen_sharing=0){
     var partnerName = connectionData[0]
     dataBuffer[partnerName] = []
-    var partnerDeviceType = connectionData[1] == 'hasCamera' ? 'video/webm; codecs="vp8,opus"' : 'audio/webm;codecs=opus'
+    var partnerDeviceType 
+    if (connectionData[1] == 'hasCamera'){
+        partnerDeviceType = 'video/webm; codecs="vp8,opus"'
+    } else if (connectionData[1] == 'audio'){
+        partnerDeviceType = 'audio/webm;codecs=opus'
+    } else {partnerDeviceType = 'video/webm; codecs="vp8"'}
     var sub_websocket = new WebSocket("wss://gintaku.xyz:9999/");
+    console.log(screen_sharing)
     if (screen_sharing){
         var videoElement = SHARE_VIDEO
     }else {
         var videoElement = createVideoElement(partnerName)
     }
+
     var mediaSource
 
     sub_websocket.onopen = ()=>{
@@ -151,15 +164,22 @@ function processNewConnection(connectionData,delay=0,screen_sharing=0){
         }
         },delay)
         sub_websocket.onclose = () => {
-            document.getElementById('col-'+partnerName).remove()
-            if (document.getElementsByTagName('video').length == 1){
-                mediaRecorder.stop()
+            if (screen_sharing){
+                console.log('aaaaaa')
+                handleVideoElement('')
+            }else {
+
+                document.getElementById('col-'+partnerName).remove()
+                if (document.getElementsByTagName('video').length == 1){
+                    mediaRecorder.stop()
+                }
             }
         }
     }
 }
 
 function handleStreamingData(mediaSource,videoElement,partnerDeviceType,partnerName){
+    var videoElement
     mediaSource = new MediaSource()
     videoElement.src = URL.createObjectURL(mediaSource)
     mediaSource.onsourceopen = () => {
@@ -196,6 +216,7 @@ function createVideoElement(id){
     clone_node.children[0].classList.remove('border-primary')
     clone_node.children[0].classList.add('border-danger')
     clone_node.children[0].children[0].id = id
+    clone_node.children[0].children[0].muted = !clone_node.children[0].children[0].muted
     clone_node.children[0].children[1].children[0].innerHTML = id
     clone_node.children[0].children[1].children[0].classList.add('form-control')
     original_node.parentNode.insertBefore(clone_node, null);
@@ -253,8 +274,6 @@ const codecs = ["should-not-be-supported","vp9", "vp9.0", "vp8", "vp8.0", "avc1"
 
 const supportedVideos = getSupportedMimeTypes("video", videoTypes, codecs);
 const supportedAudios = getSupportedMimeTypes("audio", audioTypes, codecs);
-console.log(supportedVideos)
-console.log(supportedAudios)
 
     
     
